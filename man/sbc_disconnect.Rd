@@ -17,7 +17,7 @@ Cierra una conexión activa a la base de datos de forma segura.
 }
 \examples{
 \dontrun{
-conn <- sbc_connect(config, tipo = "mysql")
+conn <- sbc_connect(config)
 # ... usar conexión ...
 sbc_disconnect(conn)
 }

@@ -4,11 +4,12 @@
 \alias{sbc_connect}
 \title{Conectar a base de datos (MySQL o DB2)}
 \usage{
-sbc_connect(config, tipo)
+sbc_connect(config)
 }
 \arguments{
 \item{config}{Lista con parámetros de conexión requeridos:
 \itemize{
+\item \strong{tipo}: Tipo de base de datos ("mysql" o "db2")
 \item \strong{host}: Dirección del servidor (ej: "localhost", "192.168.1.100")
 \item \strong{user}: Usuario de la base de datos
 \item \strong{password}: Contraseña del usuario
@@ -16,8 +17,6 @@ sbc_connect(config, tipo)
 \item \strong{port}: Puerto (opcional). Por defecto: 3306 para MySQL, 50000 para DB2
 \item \strong{driver_path}: Ruta al JAR del driver JDBC (solo DB2, opcional si existe DB2_DRIVER_PATH)
 }}
-
-\item{tipo}{Tipo de base de datos. Valores válidos: \code{"mysql"} o \code{"db2"}}
 }
 \value{
 Objeto de conexión DBI con atributos adicionales:
@@ -36,15 +35,17 @@ o usar \code{sbc_with_connection()} para gestión automática.
 \dontrun{
 # Conexión a MySQL
 config_mysql <- list(
+  tipo = "mysql",
   host = "localhost",
   user = "root",
   password = "mi_password",
   dbname = "mi_base_datos"
 )
-conn_mysql <- sbc_connect(config_mysql, tipo = "mysql")
+conn_mysql <- sbc_connect(config_mysql)
 
 # Conexión a DB2
 config_db2 <- list(
+  tipo = "db2",
   host = "servidor.empresa.com",
   user = "db2inst1",
   password = "password_db2",
@@ -52,7 +53,7 @@ config_db2 <- list(
   port = 50000,
   driver_path = "/opt/ibm/db2/java/db2jcc4.jar"
 )
-conn_db2 <- sbc_connect(config_db2, tipo = "db2")
+conn_db2 <- sbc_connect(config_db2)
 
 # Usar la conexión
 result <- sbc_query(conn_mysql, "SELECT * FROM tabla LIMIT 10")

@@ -20,7 +20,7 @@ nombres de columnas y tipos de datos.
 }
 \examples{
 \dontrun{
-conn <- sbc_connect(config, tipo = "mysql")
+conn <- sbc_connect(config)
 
 # Ver estructura de una tabla
 estructura <- sbc_table_info(conn, "usuarios")

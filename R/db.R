@@ -153,6 +153,7 @@
 #'
 #' @param config Lista con parámetros de conexión requeridos:
 #'   \itemize{
+#'     \item \strong{tipo}: Tipo de base de datos ("mysql" o "db2")
 #'     \item \strong{host}: Dirección del servidor (ej: "localhost", "192.168.1.100")
 #'     \item \strong{user}: Usuario de la base de datos
 #'     \item \strong{password}: Contraseña del usuario
@@ -160,7 +161,6 @@
 #'     \item \strong{port}: Puerto (opcional). Por defecto: 3306 para MySQL, 50000 para DB2
 #'     \item \strong{driver_path}: Ruta al JAR del driver JDBC (solo DB2, opcional si existe DB2_DRIVER_PATH)
 #'   }
-#' @param tipo Tipo de base de datos. Valores válidos: \code{"mysql"} o \code{"db2"}
 #' 
 #' @return Objeto de conexión DBI con atributos adicionales:
 #'   \itemize{
@@ -175,15 +175,17 @@
 #' \dontrun{
 #' # Conexión a MySQL
 #' config_mysql <- list(
+#'   tipo = "mysql",
 #'   host = "localhost",
 #'   user = "root",
 #'   password = "mi_password",
 #'   dbname = "mi_base_datos"
 #' )
-#' conn_mysql <- sbc_connect(config_mysql, tipo = "mysql")
+#' conn_mysql <- sbc_connect(config_mysql)
 #' 
 #' # Conexión a DB2
 #' config_db2 <- list(
+#'   tipo = "db2",
 #'   host = "servidor.empresa.com",
 #'   user = "db2inst1",
 #'   password = "password_db2",
@@ -191,7 +193,7 @@
 #'   port = 50000,
 #'   driver_path = "/opt/ibm/db2/java/db2jcc4.jar"
 #' )
-#' conn_db2 <- sbc_connect(config_db2, tipo = "db2")
+#' conn_db2 <- sbc_connect(config_db2)
 #' 
 #' # Usar la conexión
 #' result <- sbc_query(conn_mysql, "SELECT * FROM tabla LIMIT 10")
@@ -199,8 +201,19 @@
 #' # Cerrar conexión
 #' sbc_disconnect(conn_mysql)
 #' }
-sbc_connect <- function(config, tipo) {
-  tipo <- tolower(tipo)
+sbc_connect <- function(config) {
+  # Validar que existe config$tipo
+  if (is.null(config$tipo)) {
+    stop(
+      "No se pudo determinar el tipo de base de datos.\n\n",
+      "La configuración debe incluir el campo 'tipo':\n",
+      "   config <- list(tipo = 'mysql', host = ..., user = ..., ...)\n\n",
+      "Tipos válidos: 'mysql' o 'db2'",
+      call. = FALSE
+    )
+  }
+  
+  tipo <- tolower(config$tipo)
   
   # Validar configuración
   .sbc_validate_config(config, tipo)
@@ -249,7 +262,9 @@ sbc_connect <- function(config, tipo) {
 #' 
 #' @seealso \code{\link{sbc_connect}}
 sbc_connect_mysql <- function(config) {
-  sbc_connect(config, tipo = "mysql")
+  # Asegurar que el tipo sea mysql
+  config$tipo <- "mysql"
+  sbc_connect(config)
 }
 
 #' Desconectar de base de datos
@@ -262,7 +277,7 @@ sbc_connect_mysql <- function(config) {
 #' 
 #' @examples
 #' \dontrun{
-#' conn <- sbc_connect(config, tipo = "mysql")
+#' conn <- sbc_connect(config)
 #' # ... usar conexión ...
 #' sbc_disconnect(conn)
 #' }
@@ -493,7 +508,7 @@ sbc_with_connection <- function(config, query_fn) {
   
   tryCatch({
     # Establecer conexión
-    conn <- sbc_connect(config, tipo = tipo)
+    conn <- sbc_connect(config)
     
     # Ejecutar función del usuario
     resultado <- query_fn(conn)
@@ -529,7 +544,7 @@ sbc_with_connection <- function(config, query_fn) {
 #' 
 #' @examples
 #' \dontrun{
-#' conn <- sbc_connect(config, tipo = "mysql")
+#' conn <- sbc_connect(config)
 #' 
 #' # Listar todas las tablas
 #' tablas <- sbc_list_tables(conn)
@@ -591,7 +606,7 @@ sbc_list_tables <- function(conn) {
 #' 
 #' @examples
 #' \dontrun{
-#' conn <- sbc_connect(config, tipo = "mysql")
+#' conn <- sbc_connect(config)
 #' 
 #' # Verificar si existe una tabla
 #' if (sbc_table_exists(conn, "usuarios")) {
@@ -648,7 +663,7 @@ sbc_table_exists <- function(conn, nombre_tabla, ignorar_caso = TRUE) {
 #' 
 #' @examples
 #' \dontrun{
-#' conn <- sbc_connect(config, tipo = "mysql")
+#' conn <- sbc_connect(config)
 #' 
 #' # Ver estructura de una tabla
 #' estructura <- sbc_table_info(conn, "usuarios")

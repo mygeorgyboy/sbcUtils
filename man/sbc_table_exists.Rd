@@ -21,7 +21,7 @@ Comprueba si una tabla específica existe en la base de datos conectada.
 }
 \examples{
 \dontrun{
-conn <- sbc_connect(config, tipo = "mysql")
+conn <- sbc_connect(config)
 
 # Verificar si existe una tabla
 if (sbc_table_exists(conn, "usuarios")) {

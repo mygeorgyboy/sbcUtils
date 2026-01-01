@@ -18,7 +18,7 @@ en la base de datos conectada.
 }
 \examples{
 \dontrun{
-conn <- sbc_connect(config, tipo = "mysql")
+conn <- sbc_connect(config)
 
 # Listar todas las tablas
 tablas <- sbc_list_tables(conn)
