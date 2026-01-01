@@ -12,13 +12,13 @@
 
 ### 2. Conectar repositorio local con GitHub
 
-Ejecuta estos comandos en la terminal (reemplaza `TU-USUARIO` con tu usuario de GitHub):
+Ejecuta estos comandos en la terminal:
 
 ```bash
 cd /Users/jramirez/Documents/EstudiosR/proyectos/sbcUtils
 
 # Configurar remote
-git remote add origin https://github.com/TU-USUARIO/sbcUtils.git
+git remote add origin https://github.com/mygeorgyboy/sbcUtils.git
 
 # Renombrar rama a main (opcional pero recomendado)
 git branch -M main
@@ -29,7 +29,7 @@ git push -u origin main
 
 ### 3. Verificar en GitHub
 
-Ve a `https://github.com/TU-USUARIO/sbcUtils` y verifica que todos los archivos estén ahí.
+Ve a `https://github.com/mygeorgyboy/sbcUtils` y verifica que todos los archivos estén ahí.
 
 ---
 
@@ -71,7 +71,7 @@ Una vez subido a GitHub, cualquiera puede instalarlo con:
 
 ```r
 # Instalar desde GitHub
-remotes::install_github("TU-USUARIO/sbcUtils")
+remotes::install_github("mygeorgyboy/sbcUtils")
 
 # Usar el paquete
 library(sbcUtils)
@@ -101,4 +101,4 @@ Después de subir a GitHub, verifica que:
 - [ ] El código está en GitHub
 - [ ] El README.md se visualiza correctamente
 - [ ] La licencia aparece en el repo
-- [ ] Puedes instalar el paquete con `remotes::install_github()`
+- [ ] Puedes instalar el paquete con `remotes::install_github("mygeorgyboy/sbcUtils")`
