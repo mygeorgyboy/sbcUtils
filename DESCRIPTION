@@ -1,25 +1,27 @@
 Package: sbcUtils
-Title: Utilidades para Estudios de Mercado SBC
-Version: 0.1.0
+Title: Utilidades para SBC Research
+Version: 0.1.1
 Authors@R: 
-    person("Jorge", "Ramírez", , "jorge@sbc.com", role = c("aut", "cre"))
-Description: Colección de funciones para análisis de estudios de mercado,
-    incluyendo conexión a bases de datos MySQL, sumarización de datos,
-    visualización y generación de reportes.
+    person("Jorge", "Ramírez", , "jramirez@sb1.mx", role = c("aut", "cre"))
+Description: Funciones de utilidad para proyectos de SBC, incluyendo
+    gestión de conexiones a bases de datos MySQL y DB2.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Imports:
     DBI,
-    RMySQL,
     dplyr,
-    tibble,
-    glue
+    glue,
+    purrr,
+    readr,
+    rlang,
+    tibble
 Suggests:
-    knitr,
+    RMySQL,
     RJDBC,
-    rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
 Config/testthat/edition: 3
 VignetteBuilder: knitr

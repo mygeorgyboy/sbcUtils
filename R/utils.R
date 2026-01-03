@@ -177,12 +177,12 @@ sbc_get_db2_config <- function(config_name = "DB_CONFIG_DB2") {
 #' \dontrun{
 #' # Cargar estudio 2 (Conveniancia 2025)
 #' datos <- sbc_cargar_estudio_mysql(2)
-#' 
+#'
 #' # Acceder a tablas individuales
 #' encuestas <- datos$encuestas
 #' propiedades <- datos$propiedades
 #' datos_encuestas <- datos$datos
-#' 
+#'
 #' # Ver estructura
 #' names(datos)
 #' lapply(datos, nrow)
@@ -192,34 +192,34 @@ sbc_cargar_estudio_mysql <- function(num_estudio) {
   if (missing(num_estudio) || !is.numeric(num_estudio) || num_estudio <= 0) {
     stop("num_estudio debe ser un número positivo", call. = FALSE)
   }
-  
+
   # Iniciar cronómetro
   tiempo_inicio <- Sys.time()
-  
+
   # Verificar que el estudio existe y obtener su nombre
   nombre_estudio <- sbc_with_connection(sbc_get_mysql_config(), function(conn) {
     resultado <- sbc_query(
-      conn, 
+      conn,
       glue("SELECT estudio FROM estudios WHERE id_estudio = {num_estudio}"),
       mostrar_info = FALSE
     )
-    
+
     if (nrow(resultado) == 0) {
       stop(
         "El estudio #", num_estudio, " no existe en la base de datos MySQL",
         call. = FALSE
       )
     }
-    
+
     resultado$estudio[1]
   })
-  
+
   message(sprintf(
     "→ Cargando estudio #%d: '%s' desde MySQL...",
     num_estudio,
     nombre_estudio
   ))
-  
+
   # Cargar todas las tablas en una sola conexión
   datos_estudio <- sbc_with_connection(sbc_get_mysql_config(), function(conn) {
     list(
@@ -253,17 +253,17 @@ sbc_cargar_estudio_mysql <- function(num_estudio) {
       )
     )
   })
-  
+
   # Calcular tiempo transcurrido
   tiempo_total <- difftime(Sys.time(), tiempo_inicio, units = "secs")
-  
+
   message(sprintf(
     "✓ Estudio #%d '%s' cargado exitosamente (7 tablas) en %.2f segundos",
     num_estudio,
     nombre_estudio,
     as.numeric(tiempo_total)
   ))
-  
+
   datos_estudio
 }
 
@@ -284,12 +284,12 @@ sbc_cargar_estudio_mysql <- function(num_estudio) {
 #' \dontrun{
 #' # Cargar estudio 118 (Farmacias 2025)
 #' datos <- sbc_cargar_estudio_db2(118)
-#' 
+#'
 #' # Acceder a tablas individuales
 #' encuestas <- datos$encuestas
 #' propiedades <- datos$propiedades
 #' estatus <- datos$estatus
-#' 
+#'
 #' # Ver estructura
 #' names(datos)
 #' lapply(datos, nrow)
@@ -299,34 +299,34 @@ sbc_cargar_estudio_db2 <- function(num_estudio) {
   if (missing(num_estudio) || !is.numeric(num_estudio) || num_estudio <= 0) {
     stop("num_estudio debe ser un número positivo", call. = FALSE)
   }
-  
+
   # Iniciar cronómetro
   tiempo_inicio <- Sys.time()
-  
+
   # Verificar que el estudio existe y obtener su nombre
   nombre_estudio <- sbc_with_connection(sbc_get_db2_config(), function(conn) {
     resultado <- sbc_query(
-      conn, 
+      conn,
       glue("SELECT NOMBRE_ESTUDIO FROM TABLET_SURVEYS.ESTUDIOS WHERE ID_ESTUDIO = {num_estudio}"),
       mostrar_info = FALSE
     )
-    
+
     if (nrow(resultado) == 0) {
       stop(
         "El estudio #", num_estudio, " no existe en la base de datos DB2",
         call. = FALSE
       )
     }
-    
+
     resultado$nombre_estudio[1]
   })
-  
+
   message(sprintf(
     "→ Cargando estudio #%d: '%s' desde DB2...",
     num_estudio,
     nombre_estudio
   ))
-  
+
   # Cargar todas las tablas del esquema TABLET_SURVEYS en una sola conexión
   datos <- sbc_with_connection(
     sbc_get_db2_config(),
@@ -355,17 +355,91 @@ sbc_cargar_estudio_db2 <- function(num_estudio) {
       )
     }
   )
-  
+
   # Calcular tiempo transcurrido
   tiempo_total <- difftime(Sys.time(), tiempo_inicio, units = "secs")
-  
+
   message(sprintf(
     "✓ Estudio #%d '%s' cargado exitosamente (5 tablas) en %.2f segundos",
     num_estudio,
     nombre_estudio,
     as.numeric(tiempo_total)
   ))
-  
+
   datos
 }
 
+
+#' Filtrar datos de estudio por lista de IDs de encuestas válidas
+#'
+#' @description
+#' Filtra todas las tablas de un estudio basándose en una lista de IDs de encuestas válidas.
+#' Aplica el filtro automáticamente a todas las tablas que contengan la columna de ID especificada.
+#'
+#' @param datos_estudio Lista con tablas del estudio (resultado de sbc_cargar_estudio_mysql)
+#' @param ids_validas Vector con los IDs de encuestas válidas a conservar
+#' @param columna_id Nombre de la columna ID para aplicar filtro (default: "id_encuesta")
+#' @param verbose Mostrar información del proceso (default: TRUE)
+#'
+#' @return Lista filtrada con las mismas tablas del estudio
+#'
+#' @examples
+#' \dontrun{
+#' # Cargar datos
+#' datos <- sbc_cargar_estudio_mysql(num_estudio = 2)
+#'
+#' # Obtener IDs válidas (ejemplo: solo encuestas aceptadas)
+#' ids_aceptadas <- datos$encuestas |>
+#'   filter(id_estatus == 1) |>
+#'   pull(id_encuesta)
+#'
+#' # Filtrar todas las tablas
+#' datos_filtrados <- sbc_filtrar_por_ids(datos, ids_aceptadas)
+#'
+#' # También puedes pasar IDs específicas
+#' datos_filtrados <- sbc_filtrar_por_ids(datos, c(1001, 1005, 1010))
+#' }
+#'
+#' @export
+sbc_filtrar_por_ids <- function(datos_estudio,
+                                ids_validas,
+                                columna_id = "id_encuesta",
+                                verbose = TRUE) {
+
+  # Validaciones
+  if (!is.list(datos_estudio)) {
+    stop("datos_estudio debe ser una lista de data.frames")
+  }
+
+  if (missing(ids_validas) || length(ids_validas) == 0) {
+    stop("Debe proporcionar al menos un ID válido en ids_validas")
+  }
+
+  if (verbose) {
+    cat(glue::glue("🔍 sbc_filtrar_por_ids: Filtrando por {length(ids_validas)} IDs válidas"), "\n")
+  }
+
+  # Aplicar filtro a todas las tablas que tengan la columna ID
+  datos_filtrados <- purrr::map(datos_estudio, function(tabla) {
+    if (is.data.frame(tabla) && columna_id %in% colnames(tabla)) {
+      filas_antes <- nrow(tabla)
+      tabla_filtrada <- tabla |> dplyr::filter(.data[[columna_id]] %in% ids_validas)
+      filas_despues <- nrow(tabla_filtrada)
+
+      if (verbose) {
+        nombre_tabla <- names(datos_estudio)[which(sapply(datos_estudio, identical, tabla))[1]]
+        cat(glue::glue("  ✅ {nombre_tabla}: {filas_antes} → {filas_despues} filas"), "\n")
+      }
+
+      return(tabla_filtrada)
+    } else {
+      return(tabla)
+    }
+  })
+
+  if (verbose) {
+    cat("\n✨ Filtrado completado\n\n")
+  }
+
+  return(datos_filtrados)
+}
