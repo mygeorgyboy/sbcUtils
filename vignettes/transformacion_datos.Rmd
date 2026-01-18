@@ -1,0 +1,279 @@
+---
+title: "Transformación de Datos de Encuestas"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Transformación de Datos de Encuestas}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Introducción
+
+El paquete `sbcUtils` incluye herramientas especializadas para transformar datos de encuestas desde formato largo (key-value pairs) a múltiples tablas relacionales. Esta funcionalidad es especialmente útil para procesar estudios de mercado con cuestionarios complejos que incluyen loops, preguntas múltiples, y diferentes tipos de respuestas.
+
+```{r setup}
+library(sbcUtils)
+library(dplyr)
+library(knitr)
+```
+
+# Estructura del Data Book
+
+## ¿Qué es el Data Book?
+
+El "data book" es un archivo de configuración que define cómo transformar cada propiedad de la encuesta. Contiene metadatos sobre el cuestionario y especifica la estructura destino de las tablas relacionales.
+
+```{r}
+# Ver ejemplo de estructura
+data(ejemplo_data_book)
+kable(head(ejemplo_data_book, 10))
+```
+
+## Columnas del Data Book
+
+- **action**: Define si procesar la propiedad (`NA`) o ignorarla (`"ignorar"`)
+- **table**: Tabla destino donde almacenar la propiedad  
+- **property**: Nombre base de la propiedad
+- **questionClass**: Tipo de pregunta que determina el procesamiento
+- **forEachValue**: "YES" para forzar loops como simples
+- **inLoop**: "YES" si la propiedad está en un loop
+- **question**: Texto de la pregunta (documentación)
+
+# Flujo de Trabajo
+
+## 1. Generación del Data Book Base
+
+El data book base se genera automáticamente desde el XML del cuestionario:
+
+```r
+# Comando Java para generar data_book.tsv desde XML
+system("java -cp sbc_surveys_lib.jar mx.sb1.survlib.parsers.PropertyBookGenerator cuestionario.xml data_book.tsv")
+
+# Leer y agregar propiedades del sistema
+data_book <- read_tsv("data_book.tsv")
+
+# Agregar propiedades GPS y timestamps
+propiedades_sistema <- tibble(
+  property = c("sys_gps_lat", "sys_gps_lon", "sys_ts_inicio", "sys_ts_fin"),
+  questionClass = c("SYSTEM_GPS", "SYSTEM_GPS", "SYS_TS_INICIO", "SYS_TS_FIN"),
+  inLoop = "NO",
+  pregunta = c("Latitud GPS", "Longitud GPS", "Timestamp Inicio", "Timestamp Fin")
+)
+
+data_book_completo <- bind_rows(data_book, propiedades_sistema)
+```
+
+## 2. Configuración Manual
+
+Se edita el data book para agregar las columnas `action` y `table`:
+
+```r
+# Crear plantilla para editar
+sbc_crear_plantilla_data_book(
+  propiedades = unique(data_book$property),
+  archivo_salida = "data_book_plantilla.xlsx"
+)
+```
+
+## 3. Transformación de Datos
+
+```r
+# Cargar data book configurado
+data_book_final <- openxlsx::read.xlsx("data_book_completo.xlsx") |>
+  tibble()
+
+# Transformar datos de encuestas
+tablas <- sbc_transformar_datos_a_tablas(
+  data_book = data_book_final,
+  datos_propiedades = estudio$propiedades
+)
+
+# Acceder a tablas específicas
+encuestas <- tablas$encuestas
+productos <- tablas$productos  
+consumo_bebidas <- tablas$consumo_bebidas
+```
+
+# Tipos de Propiedades
+
+## Propiedades Simples
+
+Preguntas que aparecen una sola vez por encuesta:
+
+```{r eval=FALSE}
+# Ejemplo: sexo, edad, ciudad
+# Input: 
+# id_encuesta | propiedad | valor
+# 138         | sexo      | "Masculino"
+# 138         | edad      | "25-34"
+
+# Output en tabla 'encuestas':
+# id_encuesta | sexo      | edad
+# 138         | Masculino | 25-34
+```
+
+## Propiedades Múltiples
+
+Preguntas de selección múltiple con sufijos:
+
+```{r eval=FALSE}
+# Ejemplo: marcas preferidas
+# Input:
+# id_encuesta | propiedad        | valor
+# 138         | marca_pref_1     | "Coca-Cola"
+# 138         | marca_pref_2     | "Pepsi"
+
+# Output:
+# id_encuesta | marca_pref_1 | marca_pref_2
+# 138         | Coca-Cola    | Pepsi
+```
+
+## Propiedades en Loop
+
+Preguntas que se repiten en iteraciones:
+
+```{r eval=FALSE}
+# Ejemplo: consumo de bebidas
+# Input:
+# id_encuesta | propiedad                          | valor
+# 138         | bebida_consumida_1                 | "Coca-Cola"
+# 138         | frecuencia_consumo_1              | "Diario"
+# 138         | bebida_consumida_2                 | "Agua"
+# 138         | frecuencia_consumo_2              | "Frecuente"
+
+# Output en tabla 'consumo_bebidas':
+# id_encuesta | idx | bebida_consumida | frecuencia_consumo
+# 138         | 1   | Coca-Cola        | Diario
+# 138         | 2   | Agua             | Frecuente
+```
+
+# Configuración de Tablas Comunes
+
+## Tabla de Encuestas (Demográficos)
+
+```{r eval=FALSE}
+# Configuración típica para datos demográficos
+data_book_encuestas <- tribble(
+  ~action, ~table,     ~property, ~questionClass,        ~inLoop,
+  NA,      "encuestas", "sexo",    "SINGLE_FIXED_CHOICE", "NO",
+  NA,      "encuestas", "edad",    "SINGLE_FIXED_CHOICE", "NO", 
+  NA,      "encuestas", "ciudad",  "SINGLE_FIXED_CHOICE", "NO"
+)
+```
+
+## Tabla de Productos (Con Loops)
+
+```{r eval=FALSE}
+# Productos mencionados en la encuesta
+data_book_productos <- tribble(
+  ~action, ~table,      ~property,     ~questionClass, ~inLoop, ~forEachValue,
+  NA,      "productos",  "prod_marca",  "TEXT",         "YES",   "YES",
+  NA,      "productos",  "prod_precio", "NUMBER",       "YES",   "YES",
+  NA,      "productos",  "prod_cat",    "SINGLE_FIXED", "YES",   "YES"
+)
+```
+
+# Casos Especiales
+
+## Manejo de forEach vs While Loops
+
+Algunos loops requieren tratamiento especial usando `forEachValue = "YES"`:
+
+```{r eval=FALSE}
+# Loop forEach: cada iteración es un valor diferente
+# forEachValue = "YES" fuerza tratamiento simple
+tribble(
+  ~property,           ~questionClass,            ~inLoop, ~forEachValue,
+  "bebida_consumida",  "MULTIPLE_FIXED_CHOICE",  "YES",   "YES"
+)
+
+# Loop While: cada iteración puede tener múltiples valores  
+# forEachValue = NA permite comportamiento por defecto
+tribble(
+  ~property,           ~questionClass,            ~inLoop, ~forEachValue,
+  "caracteristicas",   "MULTIPLE_FIXED_CHOICE",  "YES",   NA
+)
+```
+
+## Propiedades a Ignorar
+
+```{r eval=FALSE}
+# Instrucciones para encuestadores u otros elementos no analíticos
+tribble(
+  ~action,    ~table, ~property,           ~questionClass,
+  "ignorar",  NA,     "instrucciones",     "SINGLE_FIXED_CHOICE",
+  "ignorar",  NA,     "notas_internas",    "TEXT"
+)
+```
+
+# Validación y Troubleshooting
+
+La función incluye validaciones automáticas y mensajes informativos:
+
+```{r eval=FALSE}
+# La función reporta:
+# 🚀 Iniciando transformación de datos...
+# 📊 Procesando 15,432 registros de propiedades  
+# 🚫 Identificando propiedades a ignorar...
+# ✅ 95 propiedades válidas para procesar
+# 📋 Procesando tabla: encuestas
+#    → 12 propiedades simples
+# 📋 Procesando tabla: productos  
+#    → 8 propiedades en loop
+# ✅ Tabla 'productos' creada con 156 filas
+# 🎉 Transformación completada!
+```
+
+## Errores Comunes
+
+1. **Columnas faltantes en data_book**:
+   ```
+   Error: data_book debe contener las columnas: action, table, property
+   ```
+
+2. **Propiedades sin tabla asignada**:
+   ```
+   ⚠️ Encontradas 5 propiedades sin tabla asignada: prop1, prop2...
+   ```
+
+3. **Correspondencia datos vs data_book**:
+   ```
+   ⚠️ Propiedades en datos pero no en data_book: nueva_prop1, nueva_prop2...
+   ```
+
+# Mejores Prácticas
+
+1. **Versionado**: Mantén versiones del data_book para cada actualización del cuestionario
+2. **Documentación**: Usa la columna `question` para documentar el propósito de cada propiedad  
+3. **Validación**: Revisa siempre los warnings sobre propiedades faltantes
+4. **Testing**: Prueba la transformación con un subconjunto pequeño de datos primero
+5. **Backup**: Mantén copias de seguridad de los data_books configurados manualmente
+
+```{r eval=FALSE}
+# Ejemplo de flujo completo recomendado
+data_book <- openxlsx::read.xlsx("data_book_completo_v2.xlsx") |> 
+  tibble()
+
+# Transformar solo algunas encuestas para prueba
+tablas_prueba <- sbc_transformar_datos_a_tablas(
+  data_book = data_book,
+  datos_propiedades = estudio$propiedades,
+  id_encuesta_filter = c(1:10)
+)
+
+# Revisar resultados antes de procesar todo
+lapply(tablas_prueba, function(x) c(nrow = nrow(x), ncol = ncol(x)))
+
+# Si todo está correcto, procesar dataset completo
+tablas_final <- sbc_transformar_datos_a_tablas(
+  data_book = data_book,
+  datos_propiedades = estudio$propiedades
+)
+```
